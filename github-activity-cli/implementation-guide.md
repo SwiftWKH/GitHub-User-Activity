@@ -64,12 +64,16 @@ def display_activity(activity):
 ```python
 if event_type == 'PushEvent':
     payload = event.get('payload', {})
-    commits = payload.get('commits', [])
-    ref = payload.get('ref', '').replace('refs/heads/', '')
+    head = payload.get('head')
+    before = payload.get('before')
+    commit_count = get_commit_count_from_push(repo_name, before, head)
+    print(f"- Pushed {commit_count} commit{'s' if commit_count != 1 else ''} to {repo_name}")
 ```
-- Extracts commit information from payload
-- Handles branch references by removing `refs/heads/` prefix
-- Displays commit count or branch information
+- Extracts SHA hashes from payload (before and head commits)
+- Makes a secondary API call to GitHub's Compare endpoint to get actual commit count
+- Uses the Compare API endpoint: `/repos/{owner}/{repo}/compare/{before}...{head}`
+- Returns `total_commits` field from the response for accurate commit count
+- Includes fallback logic if API call fails (defaults to 1 commit)
 
 **IssuesEvent:**
 ```python
@@ -109,6 +113,35 @@ if __name__ == "__main__":
 - `if __name__ == "__main__"` ensures main() only runs when script is executed directly
 
 ## Key Programming Concepts
+
+### GitHub Events API Limitation & Solution
+
+**The Problem:**
+The GitHub Events API endpoint (`/users/{username}/events`) returns event payloads without the full `commits` array. For `PushEvent` objects, the payload only contains:
+- `push_id`: Unique identifier for the push
+- `ref`: The branch reference (e.g., "refs/heads/main")
+- `before`: SHA of the commit before the push
+- `head`: SHA of the commit after the push
+- `repository_id`: ID of the repository
+
+It does NOT include the `commits` array, so `payload.get('commits', [])` always returns an empty list, resulting in 0 commits being displayed.
+
+**The Solution:**
+Use GitHub's **Compare API** (`/repos/{owner}/{repo}/compare/{before}...{head}`) to get the actual commit count:
+```python
+def get_commit_count_from_push(repo_name, before_sha, head_sha):
+    url = f"https://api.github.com/repos/{repo_name}/compare/{before_sha}...{head_sha}"
+    response = urllib.request.urlopen(req)
+    data = json.loads(response.read())
+    return data.get('total_commits', 0)
+```
+
+The Compare endpoint returns detailed information including:
+- `total_commits`: The exact number of commits between the two SHAs
+- `commits`: Array of all commits in the range
+- `files`: Changed files and statistics
+
+This allows us to display accurate commit counts like "Pushed 3 commits to kamranahmedse/developer-roadmap" instead of showing 0.
 
 ### Error Handling Strategy
 - **Defensive programming**: Uses `.get()` instead of direct dictionary access
