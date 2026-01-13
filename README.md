@@ -51,3 +51,7 @@ Uses only Python standard library:
 - `sys` - Command line arguments
 
 No external packages required - runs with any Python 3 installation.
+
+## Discoveries
+
+- The GitHub Events API omits commit details for `PushEvent`. To show real commit counts, use the Compare endpoint: `/repos/{owner}/{repo}/compare/{before}...{head}`. The response includes `total_commits`, which reflects how many commits were pushed.

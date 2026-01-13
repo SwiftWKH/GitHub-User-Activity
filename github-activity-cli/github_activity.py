@@ -21,15 +21,23 @@ def fetch_github_activity(username):
     except Exception as e:
         print(f"Error fetching data: {e}")
         return None
-    
-def get_commit_count(username, push_id):
-    """Fetch the actual commit count for a push event"""
+
+def get_commit_count_from_push(repo_name, before_sha, head_sha):
+    """Get the actual number of commits in a push"""
     try:
-        # Try to get commits from the GH API - using the push endpoint
-        url = f"https://api.github.com/repos/owner/repo/commits?sha=head"
-        # Since we don't have direct access to commit count from events API,
-        # we'll use the 'size' from payload if available, or make a call to commits endpoint
-        return None
+        url = f"https://api.github.com/repos/{repo_name}/compare/{before_sha}...{head_sha}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-Github-Api-Version": "2022-11-28",
+                "User-Agent": "github-activity-script"
+            }
+        )
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read())
+            total_commits = data.get('total_commits', 0)
+            return total_commits if total_commits > 0 else None
     except:
         return None
 
@@ -71,26 +79,6 @@ def display_activity(activity):
 
         elif event_type == 'WatchEvent':
             print(f"- Starred {repo_name}")
-
-def get_commit_count_from_push(repo_name, before_sha, head_sha):
-    """Get the actual number of commits in a push"""
-    try:
-        url = f"https://api.github.com/repos/{repo_name}/compare/{before_sha}...{head_sha}"
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "X-Github-Api-Version": "2022-11-28",
-                "User-Agent": "github-activity-script"
-            }
-        )
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read())
-            total_commits = data.get('total_commits', 0)
-            return total_commits if total_commits > 0 else None
-    except:
-        return None
-
 
 def main():
     if len(sys.argv) != 2:
